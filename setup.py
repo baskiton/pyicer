@@ -20,7 +20,8 @@ cc.compile(
 cc.link_shared_lib(
     objects=cc.object_filenames(sources, output_dir='build'),
     output_libname='icer',
-    output_dir='build/lib'
+    output_dir='build/lib',
+    extra_preargs=['-shared'],
 )
 
 
