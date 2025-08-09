@@ -51,8 +51,8 @@ setup(
     author='Alexander Baskikh',
     author_email='baskiton@gmail.com',
     description='Python wrapper for libicer',
-    # long_description=get_file('README.md'),
-    # long_description_content_type='text/markdown',
+    long_description=get_file('README.md'),
+    long_description_content_type='text/markdown',
     packages=find_packages(),
     install_requires=[
         'numpy',
