@@ -1,0 +1,3 @@
+[submodule "icer_compression"]
+	path = icer_compression
+	url = https://github.com/TheRealOrange/icer_compression.git
