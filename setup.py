@@ -1,28 +1,10 @@
 #!/usr/bin/env python3
 
 import pathlib
-import os
 import sys
 
 from glob import glob
-from distutils import ccompiler
-from setuptools import find_packages, setup
-
-
-sources = glob('icer_compression/lib_icer/src/*.c')
-cc = ccompiler.new_compiler(compiler='mingw32' if os.name == 'nt' else None)
-cc.compile(
-    sources=sources,
-    output_dir='build',
-    include_dirs=['icer_compression/lib_icer/inc'],
-    extra_preargs=['-O2', '-fPIC', '-Wall', '-Wextra', '-std=c11'],
-)
-cc.link_shared_lib(
-    objects=cc.object_filenames(sources, output_dir='build'),
-    output_libname='icer',
-    output_dir='build/lib',
-    extra_preargs=['-shared'],
-)
+from setuptools import find_packages, setup, Extension
 
 
 MINIMAL_PY_VERSION = (3, 7)
@@ -34,15 +16,14 @@ def get_file(rel_path):
     return (pathlib.Path(__file__).parent / rel_path).read_text('utf-8')
 
 
-def get_version():
-    for line in get_file('pyicer/__init__.py').splitlines():
-        if line.startswith('__version__'):
-            return line.split()[2][1:-1]
-
-
 setup(
     name='pyicer',
-    version=get_version(),
+    setuptools_git_versioning={
+        'enabled': True,
+        'template': '{tag}.{ccount}',
+        'dev_template': '{tag}.{ccount}',
+        'dirty_template': '{tag}.{ccount}',
+    },
     url='https://github.com/baskiton/pyicer',
     project_urls={
         'Source': 'https://github.com/baskiton/pyicer',
@@ -58,9 +39,19 @@ setup(
     install_requires=[
         'numpy',
     ],
+    setup_requires=[
+        'setuptools-git-versioning',
+    ],
     classifiers=[
         'Programming Language :: Python :: 3',
     ],
-    keywords='icer',
     python_requires='>=3.7',
+    ext_modules=[
+        Extension(
+            '_pyicer',
+            sources=glob('icer_compression/lib_icer/src/*.c') + ['src/_pyicer.c'],
+            include_dirs=['icer_compression/lib_icer/inc'],
+            extra_compile_args=['-std=c11', '-Wall', '-O2', '-fPIC'],
+        )
+    ],
 )

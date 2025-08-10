@@ -41,40 +41,46 @@ jobs:
           path: ./dist/*
 
   build_wheels:
-    name: Build wheels py${{ matrix.buildplat[2] }}-${{ matrix.buildplat[0] }}-${{ matrix.buildplat[1] }}
+    name: Build wheels ${{ matrix.python }}-${{ matrix.buildplat[1] }}
     runs-on: ${{ matrix.buildplat[0] }}
     strategy:
       matrix:
         buildplat:
-          - [ windows-2022, x64, "3.7" ]
-          - [ windows-2022, x86, "3.7" ]
-          - [ windows-latest, x64, "3.11" ]
+          # os, platform
+          - [ windows-2022, win_amd64 ]
+          - [ windows-2022, win32 ]
+          - [ ubuntu-latest, manylinux_x86_64 ]
+          - [ ubuntu-latest, musllinux_x86_64 ]
+        python: [ cp37, cp38, cp39, cp310, cp311, cp312, cp313, pp311 ]
+        exclude:
+          - buildplat: [ windows-2022, win32 ]
+            python: pp311
+          - buildplat: [ ubuntu-latest, musllinux_x86_64 ]
+            python: pp311
 
     steps:
-      - name: Setup python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.buildplat[2] }}
-          architecture: ${{ matrix.buildplat[1] }}
-
-      - name: Setup MinGW
-        if: ${{ matrix.buildplat[0] == 'windows-2022' }}
-        uses: egor-tensin/setup-mingw@v2.2.0
-        with:
-          platform: ${{ matrix.buildplat[1] }}
-          version: "12.2.0"
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: true
 
+      - name: Setup MSVC (32-bit)
+        if: ${{ matrix.buildplat[1] == 'win32' }}
+        uses: bus1/cabuild/action/msdevshell@v1
+        with:
+          architecture: 'x86'
+
+      - name: Setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
       - name: Build wheels
-        run: |
-          python -m pip install -U pip build
-          python -m build --wheel
+        uses: pypa/cibuildwheel@v2.23.3
+        env:
+          CIBW_BUILD: ${{ matrix.python }}-${{ matrix.buildplat[1] }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: py${{ matrix.buildplat[2] }}-${{ matrix.buildplat[0] }}-${{ matrix.buildplat[1] }}
-          path: ./dist/*.whl
+          name: ${{ matrix.python }}-${{ matrix.buildplat[1] }}
+          path: ./wheelhouse/*.whl
