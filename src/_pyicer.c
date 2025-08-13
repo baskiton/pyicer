@@ -12,16 +12,6 @@
 #include "icer.h"
 
 
-typedef struct {
-    Py_buffer data;
-    int stages;
-    int segments;
-    enum icer_filter_types filter;
-    int is_color;
-} icer_config_t;
-#define CFG_DEFAULT { .stages = 4, .segments = 6, .filter = ICER_FILTER_A, .is_color = 1 }
-
-
 PyDoc_STRVAR(decompress__doc__,
 "decompress(data: bytes[, stages: int = 4, segments: int = 6, filter: Literal['A', 'B', 'C', 'D', 'E', 'F', 'Q'] = 'A', color=1]) -> tuple\n"
 "\n"
@@ -43,42 +33,50 @@ static PyObject *
 pyicer_decompress(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     static char *kwlist[] = {"data", "stages", "segments", "filter", "color", NULL};
-    icer_config_t cfg = CFG_DEFAULT;
     const char *filter_ch = "A";
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "y*|iisi:decompress", kwlist,
-                                     &cfg.data, &cfg.stages, &cfg.segments, &filter_ch, &cfg.is_color))
+    const uint8_t *data;
+    Py_ssize_t dlen;
+    int stages = 4, segments = 6, is_color = 1;
+    enum icer_filter_types filter;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "y#|iisi:decompress", kwlist,
+                                     &data, &dlen, &stages, &segments, &filter_ch, &is_color))
         return NULL;
 
-    if (cfg.stages < 1 || cfg.stages > ICER_MAX_DECOMP_STAGES) {
+    if (dlen < (Py_ssize_t)sizeof(icer_image_segment_typedef)) {
+        PyErr_SetString(PyExc_ValueError, "data is too short");
+        return NULL;
+    }
+    if (stages < 1 || stages > ICER_MAX_DECOMP_STAGES) {
         PyErr_SetString(PyExc_ValueError, "`stages` must be between 1 and 6");
         return NULL;
     }
-    if (cfg.segments < 1 || cfg.segments > ICER_MAX_SEGMENTS) {
+    if (segments < 1 || segments > ICER_MAX_SEGMENTS) {
         PyErr_SetString(PyExc_ValueError, "`segments` must be between 1 and 32");
         return NULL;
     }
     switch (*filter_ch) {
         case 'A':
-            cfg.filter = ICER_FILTER_A;
+            filter = ICER_FILTER_A;
             break;
         case 'B':
-            cfg.filter = ICER_FILTER_B;
+            filter = ICER_FILTER_B;
             break;
         case 'C':
-            cfg.filter = ICER_FILTER_C;
+            filter = ICER_FILTER_C;
             break;
         case 'D':
-            cfg.filter = ICER_FILTER_D;
+            filter = ICER_FILTER_D;
             break;
         case 'E':
-            cfg.filter = ICER_FILTER_E;
+            filter = ICER_FILTER_E;
             break;
         case 'F':
-            cfg.filter = ICER_FILTER_F;
+            filter = ICER_FILTER_F;
             break;
         case 'Q':
-            cfg.filter = ICER_FILTER_Q;
+            filter = ICER_FILTER_Q;
             break;
         default:
             PyErr_SetString(PyExc_ValueError, "Invalid filter");
@@ -86,7 +84,7 @@ pyicer_decompress(PyObject *self, PyObject *args, PyObject *kwargs)
     }
 
     size_t image_w, image_h, actual_w, actual_h;
-    if (icer_get_image_dimensions(cfg.data.buf, cfg.data.len, &image_w, &image_h) != ICER_RESULT_OK) {
+    if (icer_get_image_dimensions(data, dlen, &image_w, &image_h) != ICER_RESULT_OK) {
         PyErr_SetString(PyExc_ValueError, "Can't determine data dimensions");
         return NULL;
     }
@@ -97,9 +95,9 @@ pyicer_decompress(PyObject *self, PyObject *args, PyObject *kwargs)
         yuv[i] = PyMem_Malloc(ch_len);
 
     int res;
-    if (cfg.is_color)
+    if (is_color)
         res = icer_decompress_image_yuv_uint16(yuv[0], yuv[1], yuv[2], &actual_w, &actual_h, image_w * image_h,
-                                               cfg.data.buf, cfg.data.len, cfg.stages, cfg.filter, cfg.segments);
+                                               data, dlen, stages, filter, segments);
     else
         res = icer_decompress_image_uint16(yuv[0], &actual_w, &actual_h, image_w * image_h,
                                            cfg.data.buf, cfg.data.len, cfg.stages, cfg.filter, cfg.segments);
@@ -114,7 +112,7 @@ pyicer_decompress(PyObject *self, PyObject *args, PyObject *kwargs)
     }
 
     PyObject *ret;
-    if (cfg.is_color)
+    if (is_color)
         ret = Py_BuildValue("((y# y# y#) n n)", yuv[0], ch_len, yuv[1], ch_len, yuv[2], ch_len, actual_w, actual_h);
     else
         ret = Py_BuildValue("(y# n n)", yuv[0], ch_len, actual_w, actual_h);
