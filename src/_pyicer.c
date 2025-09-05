@@ -94,21 +94,13 @@ pyicer_decompress(PyObject *self, PyObject *args, PyObject *kwargs)
     for (int i = 0; i < 3; i++)
         yuv[i] = PyMem_Malloc(ch_len);
 
-    // XXX: protect for data corruption https://github.com/TheRealOrange/icer_compression/issues/9
-# define SAFETY_BUF_SZ 256
-    uint8_t *cp_data = PyMem_Malloc(dlen + SAFETY_BUF_SZ * 2);
-    memcpy(cp_data + SAFETY_BUF_SZ, data, dlen);
-
     int res;
     if (is_color)
         res = icer_decompress_image_yuv_uint16(yuv[0], yuv[1], yuv[2], &actual_w, &actual_h, image_w * image_h,
-                                               cp_data + SAFETY_BUF_SZ, dlen, stages, filter, segments);
+                                               data, dlen, stages, filter, segments);
     else
         res = icer_decompress_image_uint16(yuv[0], &actual_w, &actual_h, image_w * image_h,
-                                           cp_data + SAFETY_BUF_SZ, dlen, stages, filter, segments);
-
-    PyMem_Free(cp_data);
-# undef SAFETY_BUF_SZ
+                                           data, dlen, stages, filter, segments);
 
     if (res != ICER_RESULT_OK) {
         for (int i = 0; i < 3; i++) {
